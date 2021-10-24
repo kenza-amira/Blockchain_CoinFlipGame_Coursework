@@ -14,6 +14,8 @@ contract MatchinePennies{
     enum Choice {HEAD, TAIL}
     
     function player1SendCommitment(bytes32 commitment) public payable {
+        require(player1 == address(0));
+        require(player2 == address(0));
         betAmount = msg.value;
         player1 = payable(msg.sender);
         player1Commitment = commitment;
@@ -33,18 +35,17 @@ contract MatchinePennies{
         hash = keccak256(abi.encodePacked(choice, nonce));
     }
 
-    function takeBet(Choice choice) public payable {
+    function player2TakeBet(Choice choice) public payable {
         require(player2 == address(0));
         require(player1 != address(0));
         require(msg.value == betAmount);
 
         player2 = payable(msg.sender);
         player2Choice = choice;
-        betAmount += msg.value;
         expiration = block.timestamp + 24 hours;
     }
 
-    function reveal(Choice choice, uint256 nonce) public {
+    function revealChoice(Choice choice, uint256 nonce) public {
         require(player2 != address(0));
         require(block.timestamp < expiration);
 
@@ -57,9 +58,8 @@ contract MatchinePennies{
         }
     }
 
-    function claimTimeout() public {
+    function claim() public {
         require(block.timestamp >= expiration);
-
         payable(player2).transfer(address(this).balance);
     }
 }
