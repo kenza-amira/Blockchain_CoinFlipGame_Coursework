@@ -1,28 +1,26 @@
 pragma solidity >=0.7.0 <0.9.0;
 
-contract MatchinePennies{
+contract MatchingPennies{
     address payable public player1;
     bytes32 public player1Commitment;
 
-    uint256 public betAmount;
+    // Making betAmount 1 ether
+    uint256 public betAmount = 1000000000000000000;
 
     address public player2;
-    Choice public player2Choice;
+    bool public player2Choice;
 
     uint256 public expiration = 2**256-1;
-
-    enum Choice {HEAD, TAIL}
-
+   
     event Commit(address player);
     event Bet(address player);
-    event Reveal(address player, Choice choice);
+    event Reveal(address player, bool choice);
     event Payout(address player, uint amount);
     
     function player1SendCommitment(bytes32 commitment) public payable {
         require(player1 == address(0));
         require(player2 == address(0));
-        require(msg.value == 1);
-        betAmount = msg.value;
+        require(msg.value == betAmount);
         player1 = payable(msg.sender);
         player1Commitment = commitment;
         emit Commit(player1);
@@ -32,7 +30,6 @@ contract MatchinePennies{
         require(msg.sender == player1);
         require(player2 == address(0));
         payable(msg.sender).transfer(address(this).balance);
-        betAmount = 0;
     }
     
     bytes32 public hash;
@@ -40,9 +37,10 @@ contract MatchinePennies{
     // false, 0000000000000000000000000000000000000000000
     function createHash(bool choice, uint256 nonce) public {
         hash = keccak256(abi.encodePacked(choice, nonce));
+        
     }
 
-    function player2TakeBet(Choice choice) public payable {
+    function player2TakeBet(bool choice) public payable {
         require(player2 == address(0));
         require(player1 != address(0));
         require(msg.value == betAmount);
@@ -53,7 +51,7 @@ contract MatchinePennies{
         emit Bet(player2);
     }
 
-    function revealChoice(Choice choice, uint256 nonce) public {
+    function revealChoice(bool choice, uint256 nonce) public {
         require(player2 != address(0));
         require(block.timestamp < expiration);
 
@@ -67,6 +65,13 @@ contract MatchinePennies{
             emit Payout(player1, betAmount*2);
         }
         emit Reveal(player1, choice);
+        
+        // Reinitialising values
+        player1 = payable(address(0));
+        player2 = payable(address(0));
+        player1Commitment = bytes32(0);
+        player2Choice = bool(false);
+        expiration = 2**256-1;
     }
 
     function claimReward() public {
