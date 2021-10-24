@@ -12,13 +12,20 @@ contract MatchinePennies{
     uint256 public expiration = 2**256-1;
 
     enum Choice {HEAD, TAIL}
+
+    event Commit(address player);
+    event Bet(address player);
+    event Reveal(address player, Choice choice);
+    event Payout(address player, uint amount);
     
     function player1SendCommitment(bytes32 commitment) public payable {
         require(player1 == address(0));
         require(player2 == address(0));
+        require(msg.value == 1);
         betAmount = msg.value;
         player1 = payable(msg.sender);
         player1Commitment = commitment;
+        emit Commit(player1);
     }
 
     function cancelBet() public {
@@ -43,6 +50,7 @@ contract MatchinePennies{
         player2 = payable(msg.sender);
         player2Choice = choice;
         expiration = block.timestamp + 24 hours;
+        emit Bet(player2);
     }
 
     function revealChoice(Choice choice, uint256 nonce) public {
@@ -53,13 +61,17 @@ contract MatchinePennies{
 
         if (player2Choice == choice) {
             payable(player2).transfer(address(this).balance);
+            emit Payout(player2, betAmount*2);
         } else {
             player1.transfer(address(this).balance);
+            emit Payout(player1, betAmount*2);
         }
+        emit Reveal(player1, choice);
     }
 
-    function claim() public {
+    function claimReward() public {
         require(block.timestamp >= expiration);
         payable(player2).transfer(address(this).balance);
+        emit Payout(player2, betAmount*2);
     }
 }
