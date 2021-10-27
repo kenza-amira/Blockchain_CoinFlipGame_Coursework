@@ -1,21 +1,26 @@
+// "SPDX-License-Identifier: UNLICENSED"
 pragma solidity >=0.7.0 <0.9.0;
 
 contract MatchingPennies{
-    address payable public player1;
-    bytes32 public player1Commitment;
+    address payable private player1;
+    bytes32 private player1Commitment;
 
     // Making betAmount 1 ether
-    uint256 public betAmount = 1000000000000000000;
+    uint256 public betAmount = 1 ether;
 
-    address public player2;
-    bool public player2Choice;
+    
+    address payable private player2;
+    bool private player2Choice;
+    bool private canClaim = false;
 
-    uint256 public expiration = 2**256-1;
-   
+    uint256 private expiration = 2**256-1;
+    mapping(address => uint256) balance;
+
+    
     event Commit(address player);
     event Bet(address player);
     event Reveal(address player, bool choice);
-    event Payout(address player, uint amount);
+    event Withdrawal(address player, uint amount);
     
     function player1SendCommitment(bytes32 commitment) public payable {
         require(player1 == address(0));
@@ -29,14 +34,14 @@ contract MatchingPennies{
     function cancelBet() public {
         require(msg.sender == player1);
         require(player2 == address(0));
-        payable(msg.sender).transfer(address(this).balance);
+        balance[msg.sender] += address(this).balance;
+        player1 = payable(address(0));
     }
     
-    bytes32 public hash;
     // true, 0000000000000000000000000000000000000000000
     // false, 0000000000000000000000000000000000000000000
-    function createHash(bool choice, uint256 nonce) public {
-        hash = keccak256(abi.encodePacked(choice, nonce));
+    function createHash(bool choice, uint256 nonce) public pure returns (bytes32 commitment){
+        return keccak256(abi.encodePacked(choice, nonce));
         
     }
 
@@ -47,7 +52,8 @@ contract MatchingPennies{
 
         player2 = payable(msg.sender);
         player2Choice = choice;
-        expiration = block.timestamp + 24 hours;
+        expiration = block.timestamp + 10 minutes;
+        canClaim = true;
         emit Bet(player2);
     }
 
@@ -57,12 +63,10 @@ contract MatchingPennies{
 
         require(keccak256(abi.encodePacked(choice, nonce)) == bytes32(player1Commitment));
 
-        if (player2Choice == choice) {
-            payable(player2).transfer(address(this).balance);
-            emit Payout(player2, betAmount*2);
+        if (player2Choice != choice) {
+            balance[msg.sender] += address(this).balance;
         } else {
-            player1.transfer(address(this).balance);
-            emit Payout(player1, betAmount*2);
+            balance[msg.sender] += address(this).balance;
         }
         emit Reveal(player1, choice);
         
@@ -74,9 +78,29 @@ contract MatchingPennies{
         expiration = 2**256-1;
     }
 
-    function claimReward() public {
+    function claimTimeout() public {
         require(block.timestamp >= expiration);
-        payable(player2).transfer(address(this).balance);
-        emit Payout(player2, betAmount*2);
+        require(canClaim == true);
+        balance[player2] = address(this).balance;
+        emit Withdrawal(player2, betAmount*2);
+        
+        // Reinitialising values
+        player1 = payable(address(0));
+        player2 = payable(address(0));
+        player1Commitment = bytes32(0);
+        player2Choice = bool(false);
+        expiration = 2**256-1;
+    }
+    
+    function withdraw() public{
+        uint256 b = balance[msg.sender];
+        balance[msg.sender] = 0;
+        payable(msg.sender).transfer(b);
+
+        emit Withdrawal(msg.sender, b);
+    }
+    
+    function showbalance() public view returns (uint256 amount){
+        return balance[msg.sender];
     }
 }
