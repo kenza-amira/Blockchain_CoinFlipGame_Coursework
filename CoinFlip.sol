@@ -34,8 +34,10 @@ contract MatchingPennies{
     function cancelBet() public {
         require(msg.sender == player1);
         require(player2 == address(0));
-        balance[msg.sender] += address(this).balance;
+        balance[msg.sender] += betAmount;
         player1 = payable(address(0));
+        player1Commitment = bytes32(0);
+        
     }
     
     // true, 0000000000000000000000000000000000000000000
@@ -64,9 +66,9 @@ contract MatchingPennies{
         require(keccak256(abi.encodePacked(choice, nonce)) == bytes32(player1Commitment));
 
         if (player2Choice != choice) {
-            balance[msg.sender] += address(this).balance;
+            balance[msg.sender] += betAmount*2;
         } else {
-            balance[msg.sender] += address(this).balance;
+            balance[msg.sender] += betAmount*2;
         }
         emit Reveal(player1, choice);
         
@@ -81,7 +83,7 @@ contract MatchingPennies{
     function claimTimeout() public {
         require(block.timestamp >= expiration);
         require(canClaim == true);
-        balance[player2] = address(this).balance;
+        balance[player2] = betAmount*2;
         emit Withdrawal(player2, betAmount*2);
         
         // Reinitialising values
